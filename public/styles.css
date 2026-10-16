@@ -1538,6 +1538,10 @@ select:focus-visible {
   margin: -8px 0 12px;
 }
 
+.field-hint[hidden] {
+  display: none;
+}
+
 .auth-form .dialog-submit {
   margin-top: 1px;
 }
