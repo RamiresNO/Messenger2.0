@@ -101,31 +101,32 @@
       </main>
     </div>
 
-    <dialog class="app-dialog" id="account-dialog" aria-labelledby="account-title">
+    <dialog class="app-dialog auth-dialog" id="account-dialog" aria-labelledby="account-title">
       <div class="dialog-top">
         <span class="dialog-mark" aria-hidden="true"><span class="leaf-logo"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></span>
-        <button class="dialog-close" type="button" data-close-dialog aria-label="Закрити">×</button>
+        <span class="auth-brand">onegram</span>
       </div>
-      <p class="eyebrow">ВАШ ПРОФІЛЬ</p>
-      <h2 id="account-title">З ким сьогодні поговоримо?</h2>
-      <p class="dialog-copy">Оберіть профіль або створіть новий — без пароля та зайвих кроків.</p>
-      <form id="account-select-form">
-        <label class="field-label" for="account-select">Оберіть профіль</label>
-        <div class="select-wrap">
-          <select id="account-select"></select>
-          <span aria-hidden="true">⌄</span>
-        </div>
-        <button class="primary-button dialog-submit" type="submit" id="account-select-submit">Продовжити <span aria-hidden="true">→</span></button>
+      <p class="eyebrow">ТВІЙ ПРОСТІР ДЛЯ РОЗМОВ</p>
+      <h2 id="account-title">Увійти до onegram</h2>
+      <p class="dialog-copy" id="auth-copy">Радий, що ти повернувся. Продовжуй розмову.</p>
+      <div class="auth-tabs" role="tablist" aria-label="Автентифікація">
+        <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true" data-auth-mode="login">Увійти</button>
+        <button class="auth-tab" id="register-tab" type="button" role="tab" aria-selected="false" data-auth-mode="register">Реєстрація</button>
+      </div>
+      <form class="auth-form" id="auth-form">
+        <label class="field-label" for="username-input">Нік</label>
+        <input id="username-input" name="username" maxlength="30" placeholder="наприклад, olena" autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z0-9_.-]+" required>
+        <label class="field-label password-label" for="password-input">Пароль</label>
+        <input id="password-input" name="password" type="password" minlength="8" maxlength="128" placeholder="Мінімум 8 символів" autocomplete="current-password" required>
+        <p class="field-hint" id="password-hint" hidden>Використай щонайменше 8 символів.</p>
+        <button class="primary-button dialog-submit" id="auth-submit" type="submit">Увійти <span aria-hidden="true">→</span></button>
       </form>
-      <div class="form-divider"><span>АБО СТВОРІТЬ НОВИЙ</span></div>
-      <form class="create-account-form" id="account-create-form">
-        <label class="field-label" for="username-input">Ім’я користувача</label>
-        <div class="input-button-row">
-          <input id="username-input" name="username" maxlength="30" placeholder="наприклад, olena" autocomplete="username" required>
-          <button class="secondary-button" type="submit">Створити</button>
-        </div>
-        <p class="field-hint">Латинські літери, цифри, крапки та дефіси.</p>
-      </form>
+      <div class="form-divider"><span>АБО</span></div>
+      <button class="google-button" id="google-login" type="button">
+        <span class="google-mark" aria-hidden="true">G</span>
+        <span>Продовжити з Google</span>
+      </button>
+      <p class="field-hint google-hint" id="google-unavailable" hidden>Вхід через Google ще не налаштований.</p>
     </dialog>
 
     <dialog class="app-dialog" id="conversation-dialog" aria-labelledby="conversation-title">

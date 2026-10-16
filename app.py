@@ -4,16 +4,23 @@ import re
 import tempfile
 import threading
 import uuid
-from datetime import datetime, timezone
+import hmac
+from datetime import datetime, timedelta, timezone
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, unquote, urlencode, urlsplit
+from urllib.request import Request as UrlRequest, urlopen
+
+from auth import hash_password, hash_session_token, new_session_token, username_from_email, verify_password
 
 
 MAX_REQUEST_BYTES = 16 * 1024
 MAX_USERNAME_LENGTH = 30
 MAX_TITLE_LENGTH = 80
 MAX_MESSAGE_LENGTH = 4000
+SESSION_TTL = timedelta(days=30)
 PUBLIC_DIRECTORY = Path(__file__).parent / "public"
 STATIC_FILES = {
     "/": "index.html",
@@ -28,8 +35,9 @@ class MessengerError(Exception):
         self.status_code = status_code
 
 
-def timestamp():
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+def timestamp(value=None):
+    value = value or datetime.now(timezone.utc)
+    return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 class Messenger:
@@ -43,12 +51,13 @@ class Messenger:
             with self.file_path.open(encoding="utf-8") as data_file:
                 data = json.load(data_file)
         except FileNotFoundError:
-            return {"users": [], "conversations": [], "messages": []}
+            return {"users": [], "conversations": [], "messages": [], "sessions": []}
         except json.JSONDecodeError as error:
             raise RuntimeError(f"Could not parse messenger data at {self.file_path}.") from error
 
         if not self._valid_data(data):
             raise RuntimeError(f"Messenger data at {self.file_path} has an invalid format.")
+        data.setdefault("sessions", [])
         return data
 
     @staticmethod
@@ -56,6 +65,8 @@ class Messenger:
         if not isinstance(data, dict) or not all(
             isinstance(data.get(key), list) for key in ("users", "conversations", "messages")
         ):
+            return False
+        if "sessions" in data and not isinstance(data["sessions"], list):
             return False
 
         def valid_timestamp(value):
@@ -142,7 +153,7 @@ class Messenger:
     def get_user(self, user_id):
         return next((user for user in self.data["users"] if user["id"] == user_id), None)
 
-    def create_user(self, username):
+    def create_user(self, username, password_hash=None, google_sub=None):
         normalized = username.strip()
         if not re.fullmatch(r"[a-zA-Z0-9_.-]+", normalized):
             raise MessengerError("Ім’я може містити лише латинські літери, цифри, крапки, дефіси та підкреслення.")
@@ -151,9 +162,84 @@ class Messenger:
         with self.lock:
             if any(user["username"].casefold() == normalized.casefold() for user in self.data["users"]):
                 raise MessengerError("Це ім’я вже зайняте.", 409)
-            user = {"id": str(uuid.uuid4()), "username": normalized, "createdAt": timestamp()}
+            if google_sub and self.get_user_by_google_sub(google_sub):
+                raise MessengerError("Цей Google-акаунт уже зареєстрований.", 409)
+            user = {
+                "id": str(uuid.uuid4()),
+                "username": normalized,
+                "createdAt": timestamp(),
+                "passwordHash": password_hash,
+                "googleSub": google_sub,
+            }
             self._commit({**self.data, "users": [*self.data["users"], user]})
             return user
+
+    def find_user_by_username(self, username):
+        normalized = username.strip().casefold()
+        return next(
+            (user for user in self.data["users"] if user["username"].casefold() == normalized),
+            None,
+        )
+
+    def get_user_by_google_sub(self, google_sub):
+        return next(
+            (user for user in self.data["users"] if user.get("googleSub") == google_sub),
+            None,
+        )
+
+    @staticmethod
+    def public_user(user):
+        return {key: user[key] for key in ("id", "username", "createdAt")}
+
+    def login(self, username, password):
+        user = self.find_user_by_username(username)
+        if not user or not user.get("passwordHash") or not verify_password(password, user["passwordHash"]):
+            raise MessengerError("Неправильний нік або пароль.", 401)
+        return user
+
+    def create_session(self, user_id):
+        if not self.get_user(user_id):
+            raise MessengerError("Користувача не знайдено.", 404)
+        token = new_session_token()
+        created_at = datetime.now(timezone.utc)
+        session = {
+            "tokenHash": hash_session_token(token),
+            "userId": user_id,
+            "createdAt": timestamp(created_at),
+            "expiresAt": timestamp(created_at + SESSION_TTL),
+        }
+        with self.lock:
+            next_sessions = [
+                item for item in self.data.get("sessions", [])
+                if item["expiresAt"] > timestamp(created_at)
+            ]
+            self._commit({**self.data, "sessions": [*next_sessions, session]})
+        return token
+
+    def resolve_session(self, token):
+        if not token:
+            return None
+        now = timestamp()
+        token_hash = hash_session_token(token)
+        with self.lock:
+            session = next(
+                (item for item in self.data.get("sessions", []) if item["tokenHash"] == token_hash),
+                None,
+            )
+            if not session or session["expiresAt"] <= now:
+                return None
+            return self.get_user(session["userId"])
+
+    def delete_session(self, token):
+        if not token:
+            return
+        token_hash = hash_session_token(token)
+        with self.lock:
+            sessions = [
+                item for item in self.data.get("sessions", [])
+                if item["tokenHash"] != token_hash
+            ]
+            self._commit({**self.data, "sessions": sessions})
 
     def list_conversations(self, user_id):
         with self.lock:
@@ -244,14 +330,137 @@ class MessengerHandler(BaseHTTPRequestHandler):
         )
         super().end_headers()
 
-    def _json(self, status, payload):
+    def _json(self, status, payload, headers=None):
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
+
+    def _redirect(self, location, set_cookies=()):
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "no-store")
+        for cookie in set_cookies:
+            self.send_header("Set-Cookie", cookie)
+        self.end_headers()
+
+    def _cookie_header(self, name, value, max_age, http_only=True):
+        forwarded_proto = self.headers.get("X-Forwarded-Proto", "http").split(",", 1)[0]
+        attributes = [f"{name}={value}", "Path=/", "SameSite=Lax", f"Max-Age={max_age}"]
+        if http_only:
+            attributes.append("HttpOnly")
+        if forwarded_proto == "https":
+            attributes.append("Secure")
+        return "; ".join(attributes)
+
+    def _session_token(self):
+        cookies = SimpleCookie()
+        cookies.load(self.headers.get("Cookie", ""))
+        cookie = cookies.get("onegram_session")
+        return cookie.value if cookie else ""
+
+    def _current_user(self):
+        user = self.messenger.resolve_session(self._session_token())
+        if not user:
+            raise MessengerError("Увійдіть, щоб продовжити.", 401)
+        return user
+
+    def _google_settings(self):
+        client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+        redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "")
+        if not redirect_uri:
+            forwarded_proto = self.headers.get("X-Forwarded-Proto", "http").split(",", 1)[0]
+            redirect_uri = f"{forwarded_proto}://{self.headers.get('Host', 'localhost:3000')}/api/auth/google/callback"
+        return client_id, client_secret, redirect_uri
+
+    def _start_google_login(self):
+        client_id, _, redirect_uri = self._google_settings()
+        if not client_id or not os.environ.get("GOOGLE_CLIENT_SECRET"):
+            raise MessengerError("Вхід через Google ще не налаштований.", 503)
+        state = uuid.uuid4().hex + uuid.uuid4().hex
+        location = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "state": state,
+            "prompt": "select_account",
+        })
+        self._redirect(
+            location,
+            (self._cookie_header("onegram_oauth_state", state, 600),),
+        )
+
+    def _finish_google_login(self, query):
+        cookies = SimpleCookie()
+        cookies.load(self.headers.get("Cookie", ""))
+        state_cookie = cookies.get("onegram_oauth_state")
+        state = query.get("state", [""])[0]
+        code = query.get("code", [""])[0]
+        clear_state = self._cookie_header("onegram_oauth_state", "", 0)
+        if not state_cookie or not state or not hmac.compare_digest(state_cookie.value, state) or not code:
+            self._redirect("/?authError=google", (clear_state,))
+            return
+
+        client_id, client_secret, redirect_uri = self._google_settings()
+        try:
+            token_request = UrlRequest(
+                "https://oauth2.googleapis.com/token",
+                data=urlencode({
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            with urlopen(token_request, timeout=10) as response:
+                token_data = json.loads(response.read())
+            id_token = token_data.get("id_token")
+            if not id_token:
+                raise ValueError("Google did not return an ID token")
+            verify_url = "https://oauth2.googleapis.com/tokeninfo?" + urlencode({"id_token": id_token})
+            with urlopen(verify_url, timeout=10) as response:
+                claims = json.loads(response.read())
+            verified = str(claims.get("email_verified", "")).lower() == "true"
+            if (
+                claims.get("aud") != client_id
+                or claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com")
+                or int(claims.get("exp", 0)) <= int(datetime.now(timezone.utc).timestamp())
+                or not verified
+                or not claims.get("sub")
+                or not claims.get("email")
+            ):
+                raise ValueError("Invalid Google identity token")
+        except (HTTPError, URLError, TimeoutError, ValueError, KeyError, json.JSONDecodeError):
+            self._redirect("/?authError=google", (clear_state,))
+            return
+
+        user = self.messenger.get_user_by_google_sub(claims["sub"])
+        if not user:
+            username = username_from_email(claims["email"])
+            try:
+                user = self.messenger.create_user(username, google_sub=claims["sub"])
+            except MessengerError as error:
+                if error.status_code != 409:
+                    raise
+                suffix = uuid.uuid4().hex[:6]
+                user = self.messenger.create_user(f"{username[:23]}-{suffix}", google_sub=claims["sub"])
+        token = self.messenger.create_session(user["id"])
+        self._redirect(
+            "/",
+            (
+                self._cookie_header("onegram_session", token, int(SESSION_TTL.total_seconds())),
+                clear_state,
+            ),
+        )
 
     def _body(self):
         try:
@@ -295,25 +504,39 @@ class MessengerHandler(BaseHTTPRequestHandler):
         try:
             if path in STATIC_FILES:
                 self._static(STATIC_FILES[path])
+            elif path == "/api/auth/session":
+                user = self.messenger.resolve_session(self._session_token())
+                self._json(200, {"user": self.messenger.public_user(user) if user else None})
+            elif path == "/api/auth/google/config":
+                client_id, client_secret, _ = self._google_settings()
+                self._json(200, {"enabled": bool(client_id and client_secret)})
+            elif path == "/api/auth/google":
+                self._start_google_login()
+            elif path == "/api/auth/google/callback":
+                self._finish_google_login(query)
             elif path == "/api/users":
-                self._json(200, {"users": self.messenger.list_users()})
+                self._current_user()
+                self._json(200, {"users": [self.messenger.public_user(user) for user in self.messenger.list_users()]})
             elif path == "/api/conversations":
+                current_user = self._current_user()
                 user_id = query.get("userId", [""])[0]
-                if not user_id or not self.messenger.get_user(user_id):
-                    raise MessengerError("Користувача не знайдено.", 404)
+                if user_id != current_user["id"]:
+                    raise MessengerError("Немає доступу до цього профілю.", 403)
                 self._json(200, {"conversations": self.messenger.list_conversations(user_id)})
             elif path == "/api/search":
+                current_user = self._current_user()
                 user_id = query.get("userId", [""])[0]
-                if not user_id or not self.messenger.get_user(user_id):
-                    raise MessengerError("Користувача не знайдено.", 404)
+                if user_id != current_user["id"]:
+                    raise MessengerError("Немає доступу до цього профілю.", 403)
                 self._json(200, {"messages": self.messenger.search_messages(user_id, query.get("q", [""])[0])})
             else:
                 match = re.fullmatch(r"/api/conversations/([^/]+)/messages", path)
                 if match:
+                    current_user = self._current_user()
                     conversation_id = match.group(1)
                     user_id = query.get("userId", [""])[0]
                     conversation = self.messenger.get_conversation(conversation_id)
-                    if not conversation or user_id not in conversation["participantIds"]:
+                    if user_id != current_user["id"] or not conversation or user_id not in conversation["participantIds"]:
                         raise MessengerError("Розмову не знайдено.", 404)
                     self._json(200, {"messages": self.messenger.get_messages(conversation_id)})
                 elif path.startswith("/api/"):
@@ -328,28 +551,66 @@ class MessengerHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = unquote(urlsplit(self.path).path)
         message_route = re.fullmatch(r"/api/conversations/([^/]+)/messages", path)
-        if path not in ("/api/users", "/api/conversations") and not message_route:
+        if path == "/api/auth/logout":
+            token = self._session_token()
+            self.messenger.delete_session(token)
+            self._json(
+                200,
+                {"ok": True},
+                {"Set-Cookie": self._cookie_header("onegram_session", "", 0)},
+            )
+            return
+        if path not in ("/api/auth/register", "/api/auth/login", "/api/conversations") and not message_route:
             self._json(404, {"error": "Маршрут не знайдено."})
             return
         try:
             body = self._body()
-            if path == "/api/users":
-                user = self.messenger.create_user(self._string(body, "username"))
-                self._json(201, {"user": user})
+            if path == "/api/auth/register":
+                username = self._string(body, "username")
+                password = self._string(body, "password")
+                try:
+                    password_hash = hash_password(password)
+                except ValueError as error:
+                    raise MessengerError(str(error)) from error
+                user = self.messenger.create_user(username, password_hash=password_hash)
+                token = self.messenger.create_session(user["id"])
+                self._json(
+                    201,
+                    {"user": self.messenger.public_user(user)},
+                    {"Set-Cookie": self._cookie_header("onegram_session", token, int(SESSION_TTL.total_seconds()))},
+                )
+            elif path == "/api/auth/login":
+                user = self.messenger.login(
+                    self._string(body, "username"),
+                    self._string(body, "password"),
+                )
+                token = self.messenger.create_session(user["id"])
+                self._json(
+                    200,
+                    {"user": self.messenger.public_user(user)},
+                    {"Set-Cookie": self._cookie_header("onegram_session", token, int(SESSION_TTL.total_seconds()))},
+                )
             elif path == "/api/conversations":
+                current_user = self._current_user()
                 if not isinstance(body, dict) or not isinstance(body.get("participantIds"), list):
                     raise MessengerError("Перевірте заповнені поля та спробуйте ще раз.")
                 if not all(isinstance(item, str) for item in body["participantIds"]):
                     raise MessengerError("Перевірте список учасників.")
+                if current_user["id"] not in body["participantIds"]:
+                    raise MessengerError("Поточний користувач має бути учасником розмови.", 403)
                 conversation = self.messenger.create_conversation(
                     self._string(body, "title"), body["participantIds"]
                 )
                 self._json(201, {"conversation": conversation})
             else:
+                current_user = self._current_user()
                 if not isinstance(body, dict):
                     raise MessengerError("Перевірте заповнені поля та спробуйте ще раз.")
+                sender_id = self._string(body, "senderId")
+                if sender_id != current_user["id"]:
+                    raise MessengerError("Немає доступу до цього профілю.", 403)
                 message = self.messenger.send_message(
-                    message_route.group(1), self._string(body, "senderId"), self._string(body, "text")
+                    message_route.group(1), sender_id, self._string(body, "text")
                 )
                 self._json(201, {"message": message})
         except json.JSONDecodeError:

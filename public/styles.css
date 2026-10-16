@@ -1448,6 +1448,145 @@ select:focus-visible {
   }
 }
 
+.auth-dialog {
+  width: min(430px, calc(100% - 32px));
+}
+
+.auth-dialog .dialog-top {
+  margin-bottom: 25px;
+}
+
+.auth-brand {
+  margin-left: auto;
+  color: #758278;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.auth-dialog .eyebrow {
+  color: #176b4b;
+}
+
+.auth-dialog h2 {
+  margin-top: 9px;
+}
+
+.auth-dialog .dialog-copy {
+  margin-bottom: 19px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 21px;
+  padding: 4px;
+  border: 1px solid #e1e8dd;
+  border-radius: 6px;
+  background: #f0f4ed;
+}
+
+.auth-tab {
+  min-height: 36px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #78877c;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.auth-tab.active {
+  background: #fbfcf8;
+  box-shadow: 0 1px 4px rgba(28, 58, 41, 0.12);
+  color: #176b4b;
+}
+
+.auth-form {
+  display: grid;
+}
+
+.auth-form .field-label {
+  margin-bottom: 7px;
+}
+
+.auth-form input {
+  width: 100%;
+  height: 44px;
+  margin-bottom: 15px;
+  padding: 0 12px;
+  border: 1px solid #dce5d9;
+  border-radius: 5px;
+  background: #fff;
+  color: #172c24;
+  font-size: 12px;
+}
+
+.auth-form input:focus {
+  border-color: #81a68d;
+  outline: 2px solid rgba(23, 107, 75, 0.12);
+}
+
+.auth-form input::placeholder {
+  color: #a1aaa1;
+}
+
+.auth-form .field-hint {
+  margin: -8px 0 12px;
+}
+
+.auth-form .dialog-submit {
+  margin-top: 1px;
+}
+
+.google-button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid #dce5d9;
+  border-radius: 5px;
+  background: #fff;
+  color: #26352b;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.google-button:hover:not(:disabled) {
+  border-color: #a9c3ad;
+  background: #f6f9f3;
+}
+
+.google-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.google-mark {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #e3e8e0;
+  border-radius: 50%;
+  color: #4285f4;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.google-hint {
+  margin: 9px 0 0;
+  text-align: center;
+}
+
 /* onegram's night-garden palette and editorial interface. */
 :root {
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;

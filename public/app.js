@@ -1,11 +1,11 @@
 "use strict";
 
 const elements = {
-  accountCreateForm: document.querySelector("#account-create-form"),
   accountDialog: document.querySelector("#account-dialog"),
-  accountSelect: document.querySelector("#account-select"),
-  accountSelectForm: document.querySelector("#account-select-form"),
-  accountSelectSubmit: document.querySelector("#account-select-submit"),
+  authCopy: document.querySelector("#auth-copy"),
+  authForm: document.querySelector("#auth-form"),
+  authSubmit: document.querySelector("#auth-submit"),
+  authTabs: document.querySelectorAll("[data-auth-mode]"),
   chatHeader: document.querySelector("#chat-header"),
   chatPanel: document.querySelector("#chat-panel"),
   clearSearch: document.querySelector("#clear-search"),
@@ -22,6 +22,8 @@ const elements = {
   participantList: document.querySelector("#participant-list"),
   profileAvatar: document.querySelector("#profile-avatar"),
   profileName: document.querySelector("#profile-name"),
+  passwordHint: document.querySelector("#password-hint"),
+  passwordInput: document.querySelector("#password-input"),
   searchForm: document.querySelector("#search-form"),
   searchInput: document.querySelector("#search-input"),
   searchResults: document.querySelector("#search-results"),
@@ -35,6 +37,12 @@ const elements = {
   usernameInput: document.querySelector("#username-input"),
   welcomeCreate: document.querySelector("#welcome-create"),
   welcomeState: document.querySelector("#welcome-state"),
+  googleLogin: document.querySelector("#google-login"),
+  googleUnavailable: document.querySelector("#google-unavailable"),
+  accountTitle: document.querySelector("#account-title"),
+  loginTab: document.querySelector("#login-tab"),
+  registerTab: document.querySelector("#register-tab"),
+  usernameInput: document.querySelector("#username-input"),
 };
 
 const state = {
@@ -44,6 +52,8 @@ const state = {
   activeConversation: null,
   searching: false,
   toastTimer: null,
+  authMode: "login",
+  googleEnabled: false,
 };
 
 const avatarTones = ["lavender", "peach", "mint", "blue", "rose", "gold"];
@@ -154,7 +164,6 @@ function renderConversations() {
 
 function setCurrentUser(user) {
   state.user = user;
-  localStorage.setItem("study-hall-user", user.id);
   elements.profileAvatar.textContent =
     user.username.charAt(0).toLocaleUpperCase();
   elements.profileName.textContent = user.username;
@@ -321,22 +330,28 @@ async function refreshMessages(scrollToBottom = false) {
 }
 
 function openAccountDialog() {
-  const previousValue = state.user?.id ?? "";
-  elements.accountSelect.replaceChildren();
-  for (const user of state.users) {
-    const option = document.createElement("option");
-    option.value = user.id;
-    option.textContent = user.username;
-    option.selected = user.id === previousValue;
-    elements.accountSelect.append(option);
-  }
-  elements.accountSelect.disabled = state.users.length === 0;
-  elements.accountSelectSubmit.disabled = state.users.length === 0;
-  elements.accountSelectSubmit.classList.toggle(
-    "disabled-button",
-    state.users.length === 0,
-  );
+  elements.authForm.reset();
+  setAuthMode("login");
   if (!elements.accountDialog.open) elements.accountDialog.showModal();
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  const registering = mode === "register";
+  elements.accountTitle.textContent = registering ? "Створи акаунт onegram" : "Увійти до onegram";
+  elements.authCopy.textContent = registering
+    ? "Обери нік і пароль, щоб розмови залишалися тільки твоїми."
+    : "Радий, що ти повернувся. Продовжуй розмову.";
+  elements.authSubmit.innerHTML = registering
+    ? 'Створити акаунт <span aria-hidden="true">→</span>'
+    : 'Увійти <span aria-hidden="true">→</span>';
+  elements.passwordInput.autocomplete = registering ? "new-password" : "current-password";
+  elements.passwordInput.placeholder = registering ? "Створи надійний пароль" : "Введи пароль";
+  elements.passwordHint.hidden = !registering;
+  elements.loginTab.classList.toggle("active", !registering);
+  elements.registerTab.classList.toggle("active", registering);
+  elements.loginTab.setAttribute("aria-selected", String(!registering));
+  elements.registerTab.setAttribute("aria-selected", String(registering));
 }
 
 function openConversationDialog() {
@@ -437,32 +452,32 @@ async function showSearchResults(query) {
   }
 }
 
-elements.accountSelectForm.addEventListener("submit", (event) => {
+elements.authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const user = getUser(elements.accountSelect.value);
-  if (!user) {
-    showToast("Спочатку створіть профіль.");
-    return;
-  }
-  elements.accountDialog.close();
-  setCurrentUser(user);
-});
-
-elements.accountCreateForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const username = elements.usernameInput.value.trim();
+  const mode = state.authMode;
   try {
-    const result = await api("/api/users", {
+    const result = await api(`/api/auth/${mode}`, {
       method: "POST",
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({
+        username: elements.usernameInput.value.trim(),
+        password: elements.passwordInput.value,
+      }),
     });
-    state.users.push(result.user);
+    await loadUsers();
     elements.accountDialog.close();
-    elements.usernameInput.value = "";
+    elements.passwordInput.value = "";
     setCurrentUser(result.user);
   } catch (error) {
     showToast(error.message);
   }
+});
+
+for (const tab of elements.authTabs) {
+  tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode));
+}
+
+elements.googleLogin.addEventListener("click", () => {
+  window.location.assign("/api/auth/google");
 });
 
 elements.conversationForm.addEventListener("submit", async (event) => {
@@ -532,7 +547,22 @@ elements.clearSearch.addEventListener("click", () => {
   renderConversations();
 });
 
-elements.switchUser.addEventListener("click", openAccountDialog);
+elements.switchUser.addEventListener("click", async () => {
+  try {
+    await api("/api/auth/logout", { method: "POST" });
+    state.user = null;
+    state.users = [];
+    state.conversations = [];
+    state.activeConversation = null;
+    renderConversations();
+    renderMainView();
+    elements.profileAvatar.textContent = "?";
+    elements.profileName.textContent = "Гість";
+    openAccountDialog();
+  } catch (error) {
+    showToast(error.message);
+  }
+});
 elements.newChat.addEventListener("click", openConversationDialog);
 elements.sidebarCreate.addEventListener("click", openConversationDialog);
 elements.welcomeCreate.addEventListener("click", openConversationDialog);
@@ -562,15 +592,28 @@ elements.conversationDialog.addEventListener("click", (event) => {
 
 async function start() {
   try {
-    await loadUsers();
-    const savedUser = state.users.find(
-      (user) => user.id === localStorage.getItem("study-hall-user"),
-    );
-    if (savedUser) {
-      setCurrentUser(savedUser);
+    const [session, googleConfig] = await Promise.all([
+      api("/api/auth/session"),
+      api("/api/auth/google/config"),
+    ]);
+    state.googleEnabled = googleConfig.enabled;
+    elements.googleLogin.disabled = !state.googleEnabled;
+    elements.googleLogin.title = state.googleEnabled
+      ? "Продовжити з Google"
+      : "Вхід через Google ще не налаштований";
+    elements.googleUnavailable.hidden = state.googleEnabled;
+    if (session.user) {
+      await loadUsers();
+      setCurrentUser(session.user);
     } else {
-      localStorage.removeItem("study-hall-user");
       openAccountDialog();
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("authError")) {
+      showToast(params.get("authError") === "google_not_configured"
+        ? "Вхід через Google ще не налаштований."
+        : "Не вдалося увійти через Google.");
+      window.history.replaceState(null, "", window.location.pathname);
     }
   } catch (error) {
     showToast(error.message);
