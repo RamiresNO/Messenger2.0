@@ -3,5 +3,7 @@ data/
 __pycache__/
 *.py[cod]
 .venv/
+build/
+*.egg-info/
 node_modules/
 .wrangler/
