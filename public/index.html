@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8fc">
+    <meta name="description" content="Затишний простір для розмов і спільного навчання.">
+    <title>Коло — простір для розмов</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Коло — на головну">
+          <span class="brand-mark" aria-hidden="true">к</span>
+          <span class="brand-copy">
+            <strong>коло</strong>
+            <span>простір для розмов</span>
+          </span>
+        </a>
+        <form class="search-form" id="search-form" role="search">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="search-input" type="search" placeholder="Знайти повідомлення..." autocomplete="off" aria-label="Знайти повідомлення">
+          <kbd>Enter</kbd>
+        </form>
+        <button class="profile-button" id="switch-user" type="button" aria-label="Змінити користувача">
+          <span class="avatar avatar-small" id="profile-avatar">?</span>
+          <span class="profile-name" id="profile-name">Гість</span>
+          <span class="chevron" aria-hidden="true">⌄</span>
+        </button>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar" aria-label="Список розмов">
+          <div class="sidebar-heading">
+            <div>
+              <p class="eyebrow">ВАШ ПРОСТІР</p>
+              <h1>Повідомлення</h1>
+            </div>
+            <button class="icon-button new-chat-button" id="new-chat" type="button" aria-label="Створити розмову" title="Створити розмову">＋</button>
+          </div>
+          <button class="primary-button sidebar-create" id="sidebar-create" type="button">
+            <span aria-hidden="true">＋</span> Нова розмова
+          </button>
+          <div class="conversation-section">
+            <div class="section-label">
+              <span>УСІ РОЗМОВИ</span>
+              <span class="count-pill" id="conversation-count">0</span>
+            </div>
+            <nav class="conversation-list" id="conversation-list" aria-label="Ваші розмови"></nav>
+            <div class="sidebar-empty" id="sidebar-empty">
+              <span class="empty-icon" aria-hidden="true">✳</span>
+              <p>Тут поки тихо</p>
+              <span>Створіть розмову та запросіть друзів.</span>
+            </div>
+          </div>
+          <div class="sidebar-footer">
+            <span class="online-dot"></span>
+            <span>Ваші розмови збережені</span>
+          </div>
+        </aside>
+
+        <section class="chat-panel" id="chat-panel" aria-live="polite">
+          <div class="welcome-state" id="welcome-state">
+            <div class="welcome-art" aria-hidden="true">
+              <span class="art-orbit orbit-one"></span>
+              <span class="art-orbit orbit-two"></span>
+              <span class="art-spark spark-one">✳</span>
+              <span class="art-spark spark-two">✦</span>
+              <span class="art-bubble bubble-one">привіт!</span>
+              <span class="art-bubble bubble-two">як справи?</span>
+              <span class="art-center">к</span>
+            </div>
+            <p class="eyebrow">РАДІ ВАС БАЧИТИ</p>
+            <h2>Кожна гарна ідея<br>починається з розмови.</h2>
+            <p class="welcome-copy">Створіть простір для навчання, планів або просто спілкування.</p>
+            <button class="primary-button welcome-create" id="welcome-create" type="button">
+              Почати розмову <span aria-hidden="true">→</span>
+            </button>
+          </div>
+          <div class="conversation-view" id="conversation-view" hidden>
+            <div class="chat-header" id="chat-header"></div>
+            <div class="messages-area" id="messages-area" aria-label="Повідомлення розмови"></div>
+            <form class="composer" id="message-form">
+              <label class="visually-hidden" for="message-input">Ваше повідомлення</label>
+              <textarea id="message-input" rows="1" maxlength="4000" placeholder="Напишіть повідомлення..." required></textarea>
+              <div class="composer-footer">
+                <span class="composer-hint">Enter — надіслати · Shift + Enter — новий рядок</span>
+                <button class="send-button" type="submit" aria-label="Надіслати повідомлення">
+                  <span>Надіслати</span><span aria-hidden="true">↑</span>
+                </button>
+              </div>
+            </form>
+          </div>
+          <section class="search-view" id="search-view" hidden>
+            <div class="search-view-heading">
+              <div>
+                <p class="eyebrow">ПОШУК У РОЗМОВАХ</p>
+                <h2 id="search-title">Результати</h2>
+              </div>
+              <button class="text-button" id="clear-search" type="button">До розмов <span aria-hidden="true">→</span></button>
+            </div>
+            <div class="search-results" id="search-results"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="app-dialog" id="account-dialog" aria-labelledby="account-title">
+      <div class="dialog-top">
+        <span class="dialog-mark" aria-hidden="true">к</span>
+        <button class="dialog-close" type="button" data-close-dialog aria-label="Закрити">×</button>
+      </div>
+      <p class="eyebrow">ВАШ ПРОФІЛЬ</p>
+      <h2 id="account-title">З ким сьогодні поговоримо?</h2>
+      <p class="dialog-copy">Оберіть профіль або створіть новий — без пароля та зайвих кроків.</p>
+      <form id="account-select-form">
+        <label class="field-label" for="account-select">Оберіть профіль</label>
+        <div class="select-wrap">
+          <select id="account-select"></select>
+          <span aria-hidden="true">⌄</span>
+        </div>
+        <button class="primary-button dialog-submit" type="submit" id="account-select-submit">Продовжити <span aria-hidden="true">→</span></button>
+      </form>
+      <div class="form-divider"><span>АБО СТВОРІТЬ НОВИЙ</span></div>
+      <form class="create-account-form" id="account-create-form">
+        <label class="field-label" for="username-input">Ім’я користувача</label>
+        <div class="input-button-row">
+          <input id="username-input" name="username" maxlength="30" placeholder="наприклад, olena" autocomplete="username" required>
+          <button class="secondary-button" type="submit">Створити</button>
+        </div>
+        <p class="field-hint">Латинські літери, цифри, крапки та дефіси.</p>
+      </form>
+    </dialog>
+
+    <dialog class="app-dialog" id="conversation-dialog" aria-labelledby="conversation-title">
+      <div class="dialog-top">
+        <span class="dialog-mark" aria-hidden="true">✳</span>
+        <button class="dialog-close" type="button" data-close-dialog aria-label="Закрити">×</button>
+      </div>
+      <p class="eyebrow">НОВИЙ ПРОСТІР</p>
+      <h2 id="conversation-title">Створити розмову</h2>
+      <p class="dialog-copy">Дайте розмові назву та запросіть людей до свого кола.</p>
+      <form id="conversation-form">
+        <label class="field-label" for="conversation-name">Назва розмови</label>
+        <input id="conversation-name" maxlength="80" placeholder="наприклад, Підготовка до іспиту" required>
+        <div class="participants-heading">
+          <span class="field-label">Запросити учасників</span>
+          <span class="field-hint">Оберіть одного або кількох</span>
+        </div>
+        <div class="participant-list" id="participant-list"></div>
+        <button class="primary-button dialog-submit" type="submit">Створити розмову <span aria-hidden="true">→</span></button>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
