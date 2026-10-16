@@ -46,7 +46,7 @@ class MessengerApiTests(unittest.TestCase):
         with urlopen(self.base_url) as response:
             page = response.read().decode("utf-8")
             self.assertEqual(response.status, 200)
-            self.assertIn("Коло — простір для розмов", page)
+            self.assertIn("onegram — простір для розмов", page)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
         with urlopen(self.base_url + "/app.js") as response:
             self.assertIn("javascript", response.headers["Content-Type"])

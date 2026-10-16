@@ -1448,7 +1448,7 @@ select:focus-visible {
   }
 }
 
-/* Kolo's new night-garden palette and editorial interface. */
+/* onegram's night-garden palette and editorial interface. */
 :root {
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
   color: #172c24;
@@ -1672,6 +1672,140 @@ body {
   border-color: #285b43;
   border-radius: 5px;
   background: #173c2c;
+}
+
+.brand-mark,
+.dialog-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: #f8f8ed;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+}
+
+.dialog-mark {
+  width: 37px;
+  height: 37px;
+}
+
+.leaf-logo {
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 25px;
+  color: currentColor;
+}
+
+.leaf-logo::after {
+  position: absolute;
+  top: 32%;
+  left: calc(50% - 0.75px);
+  width: 1.5px;
+  height: 65%;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.leaf-logo > span {
+  position: absolute;
+  z-index: 1;
+  width: 23%;
+  height: 47%;
+  background: currentColor;
+  clip-path: polygon(50% 0, 94% 100%, 50% 80%, 6% 100%);
+}
+
+.leaf-logo > span:nth-child(1) {
+  top: 0;
+  left: 38.5%;
+}
+
+.leaf-logo > span:nth-child(2) {
+  top: 12%;
+  left: 23%;
+  transform: rotate(-34deg);
+}
+
+.leaf-logo > span:nth-child(3) {
+  top: 12%;
+  left: 54%;
+  transform: rotate(34deg);
+}
+
+.leaf-logo > span:nth-child(4) {
+  top: 27%;
+  left: 10%;
+  transform: rotate(-58deg);
+}
+
+.leaf-logo > span:nth-child(5) {
+  top: 27%;
+  left: 67%;
+  transform: rotate(58deg);
+}
+
+.leaf-logo > span:nth-child(6) {
+  top: 47%;
+  left: 27%;
+  height: 38%;
+  transform: rotate(-35deg);
+}
+
+.leaf-logo > span:nth-child(7) {
+  top: 47%;
+  left: 50%;
+  height: 38%;
+  transform: rotate(35deg);
+}
+
+.welcome-art {
+  display: grid;
+  width: 148px;
+  height: 148px;
+  place-items: center;
+  margin-bottom: 28px;
+}
+
+.hero-leaf-mark {
+  display: grid;
+  width: 112px;
+  height: 112px;
+  place-items: center;
+  border: 1px solid #cddfcf;
+  border-radius: 50%;
+  background: #e9f2e4;
+  color: #176b4b;
+}
+
+.hero-leaf-mark .leaf-logo {
+  width: 46px;
+  height: 54px;
+}
+
+.welcome-state h2 {
+  max-width: 440px;
+  font-size: 34px;
+  line-height: 1.16;
+}
+
+.welcome-copy {
+  max-width: 300px;
+}
+
+@media (max-width: 560px) {
+  .welcome-art {
+    margin-bottom: 18px;
+  }
+
+  .welcome-state h2 {
+    max-width: 320px;
+    font-size: 26px;
+  }
 }
 
 @media (max-width: 800px) {

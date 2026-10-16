@@ -47,7 +47,7 @@ test("serves the web UI and its static assets", async () => {
   await withServer(async (baseUrl) => {
     const page = await fetch(baseUrl);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /Коло — простір для розмов/);
+    assert.match(await page.text(), /onegram — простір для розмов/);
     assert.equal(page.headers.get("x-content-type-options"), "nosniff");
 
     const script = await fetch(`${baseUrl}/app.js`);

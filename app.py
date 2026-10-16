@@ -231,7 +231,7 @@ class Messenger:
 
 
 class MessengerHandler(BaseHTTPRequestHandler):
-    server_version = "KoloMessenger/1.0"
+    server_version = "OnegramMessenger/1.0"
     messenger = None
     public_directory = PUBLIC_DIRECTORY
 
@@ -375,7 +375,7 @@ def main():
         "public_directory": PUBLIC_DIRECTORY,
     })
     with ThreadingHTTPServer((host, port), handler) as server:
-        print(f"Коло працює за адресою http://{host}:{port}")
+        print(f"onegram працює за адресою http://{host}:{port}")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
