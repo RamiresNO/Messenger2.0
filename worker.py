@@ -145,16 +145,20 @@ async def _derive_password(password, salt, iterations=PASSWORD_ITERATIONS):
     for index, value in enumerate(salt):
         salt_bytes[index] = value
     usages = to_js(["deriveBits"])
-    key = await crypto.subtle.importKey(
-        "raw", password_bytes, "PBKDF2", False, usages
-    )
-    parameters = to_js(
-        {"name": "PBKDF2", "salt": salt_bytes, "iterations": iterations, "hash": "SHA-256"},
-        dict_converter=Object.fromEntries,
-    )
-    buffer = await crypto.subtle.deriveBits(parameters, key, PASSWORD_BYTES * 8)
-    digest = Uint8Array.new(buffer)
-    return bytes(int(digest[index]) for index in range(PASSWORD_BYTES))
+    try:
+        key = await crypto.subtle.importKey(
+            "raw", password_bytes, "PBKDF2", False, usages
+        )
+        parameters = to_js(
+            {"name": "PBKDF2", "salt": salt_bytes, "iterations": iterations, "hash": "SHA-256"},
+            dict_converter=Object.fromEntries,
+        )
+        buffer = await crypto.subtle.deriveBits(parameters, key, PASSWORD_BYTES * 8)
+        digest = Uint8Array.new(buffer)
+        return bytes(int(digest[index]) for index in range(PASSWORD_BYTES))
+    except Exception as error:
+        console.error("Onegram PBKDF2 failed", type(error).__name__, str(error)[:180])
+        raise
 
 
 async def _hash_password(password):
