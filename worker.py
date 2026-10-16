@@ -17,7 +17,7 @@ from auth import (
     username_from_email,
     validate_password,
 )
-from js import Headers, Object, Response as JSResponse, Uint8Array, crypto, fetch as js_fetch
+from js import Headers, Object, Response as JSResponse, Uint8Array, console, crypto, fetch as js_fetch
 from pyodide.ffi import to_js
 from workers import WorkerEntrypoint
 
@@ -137,10 +137,16 @@ def _oauth_state_cookie(state):
 
 
 async def _derive_password(password, salt, iterations=PASSWORD_ITERATIONS):
-    password_bytes = to_js(password.encode("utf-8"))
-    salt_bytes = to_js(salt)
+    password_value = password.encode("utf-8")
+    password_bytes = Uint8Array.new(len(password_value))
+    salt_bytes = Uint8Array.new(len(salt))
+    for index, value in enumerate(password_value):
+        password_bytes[index] = value
+    for index, value in enumerate(salt):
+        salt_bytes[index] = value
+    usages = to_js(["deriveBits"])
     key = await crypto.subtle.importKey(
-        "raw", password_bytes, "PBKDF2", False, ["deriveBits"]
+        "raw", password_bytes, "PBKDF2", False, usages
     )
     parameters = to_js(
         {"name": "PBKDF2", "salt": salt_bytes, "iterations": iterations, "hash": "SHA-256"},
@@ -551,5 +557,6 @@ class Default(WorkerEntrypoint):
             return _secure_response(_json_response({"error": str(error)}, error.status_code))
         except (json.JSONDecodeError, UnicodeDecodeError):
             return _secure_response(_json_response({"error": "Некоректний формат JSON."}, 400))
-        except Exception:
+        except Exception as error:
+            console.error("Onegram Worker request failed", path, type(error).__name__)
             return _secure_response(_json_response({"error": "Сталася внутрішня помилка сервера."}, 500))
