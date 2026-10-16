@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "messenger2-0",
+  "main": "worker.py",
+  "compatibility_date": "2026-10-16",
+  "compatibility_flags": ["python_workers"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mini-messenger-db",
+      "database_id": "b72ddda2-4770-4dd4-8a34-2da415c18225",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

@@ -21,6 +21,24 @@ python app.py
 
 Відкрий [http://localhost:3000](http://localhost:3000). Дані зберігаються у `data/messages.json`. Адресу та шлях до файла можна змінити змінними середовища `HOST`, `PORT` і `DATA_FILE_PATH`.
 
+## Cloudflare
+
+Для збереження публічної адреси `messenger2-0` Cloudflare Worker також реалізований на Python у `worker.py` і використовує наявну D1-базу. TypeScript та Node.js-код застосунку не потрібні. Для Python Workers потрібні [uv](https://docs.astral.sh/uv/) і Node.js для інструментів Cloudflare.
+
+```sh
+uv sync --dev
+uv run pywrangler dev
+```
+
+Перед розгортанням застосуй схему до наявної бази й опублікуй Worker:
+
+```sh
+uv run pywrangler d1 migrations apply mini-messenger-db --remote
+uv run pywrangler deploy
+```
+
+Конфігурація `wrangler.jsonc` уже містить ID бази `mini-messenger-db`. Не створюй нову базу: це збереже ту саму прив’язку й адресу Worker.
+
 ## Тести
 
 ```sh

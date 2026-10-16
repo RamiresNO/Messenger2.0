@@ -1,0 +1,9 @@
+[project]
+name = "onegram-messenger"
+version = "1.0.0"
+description = "Python Workers messenger with a local Python server"
+requires-python = ">=3.12"
+dependencies = ["workers-runtime-sdk"]
+
+[dependency-groups]
+dev = ["workers-py"]
